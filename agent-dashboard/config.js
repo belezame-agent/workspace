@@ -1,0 +1,1 @@
+const AGENTS = {alex:{name:'Alex',emoji:'🔍',role:'Research Analyst',color:'#3B82F6'},maya:{name:'Maya',emoji:'✍️',role:'Content Writer',color:'#7C3AED'},jordan:{name:'Jordan',emoji:'📊',role:'Marketing Strategist',color:'#F59E0B'},dev:{name:'Dev',emoji:'💻',role:'Full Stack Developer',color:'#10B981'},sam:{name:'Sam',emoji:'📱',role:'Social Media Manager',color:'#EC4899'}};

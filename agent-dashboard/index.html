@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agent OS Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        * { font-family: 'Inter', sans-serif; }
+        body { background: #0A0F1E; color: #E5E7EB; }
+        .glass-card { background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px; transition: all 0.3s ease; }
+        .glass-card:hover { background: rgba(255, 255, 255, 0.08); border-color: rgba(255, 255, 255, 0.15); }
+        .nav-tab { position: relative; padding: 10px 20px; cursor: pointer; font-weight: 500; color: #9CA3AF; transition: color 0.3s ease; border: none; background: transparent; }
+        .nav-tab.active { color: #FFFFFF; background: linear-gradient(135deg, rgba(124, 58, 237, 0.2), rgba(236, 72, 153, 0.2)); border-radius: 20px; box-shadow: 0 0 20px rgba(124, 58, 237, 0.3); }
+        .nav-tab:hover:not(.active) { color: #D1D5DB; }
+        @keyframes cardStaggerIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        .card-stagger { animation: cardStaggerIn 0.5s ease forwards; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .fade-in { animation: fadeIn 0.3s ease forwards; }
+        .gradient-text { background: linear-gradient(135deg, #7C3AED, #EC4899); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+        .glow-cyan { box-shadow: 0 0 20px rgba(6, 182, 212, 0.3); }
+        .agent-card { border-left: 4px solid; }
+        .status-badge { display: inline-block; padding: 4px 8px; border-radius: 6px; font-size: 12px; font-weight: 600; }
+        .status-completed { background: rgba(16, 185, 129, 0.2); color: #10B981; }
+        .status-failed { background: rgba(239, 68, 68, 0.2); color: #EF4444; }
+        .agent-badge { display: inline-block; padding: 4px 12px; border-radius: 6px; font-size: 12px; font-weight: 600; }
+        .activity-row { border-left: 3px solid; padding-left: 12px; }
+        .task-card { border: 1px solid rgba(255, 255, 255, 0.1); transition: all 0.2s; }
+        .task-card:hover { border-color: rgba(255, 255, 255, 0.2); }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.05); }
+        ::-webkit-scrollbar-thumb { background: linear-gradient(135deg, #7C3AED, #EC4899); border-radius: 4px; }
+        .toggle-switch { position: relative; width: 52px; height: 28px; background: rgba(255,255,255,0.1); border-radius: 14px; cursor: pointer; transition: all 0.3s ease; }
+        .toggle-switch.active { background: linear-gradient(135deg, #EC4899, #7C3AED); box-shadow: 0 0 15px rgba(236, 72, 153, 0.5); }
+        .toggle-switch::after { content: ''; position: absolute; width: 22px; height: 22px; background: white; border-radius: 50%; top: 3px; left: 3px; transition: all 0.3s ease; }
+        .toggle-switch.active::after { left: 27px; }
+        .settings-input { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.1); color: white; padding: 10px 14px; border-radius: 8px; width: 100%; transition: all 0.3s ease; }
+        .settings-input:focus { outline: none; border-color: #7C3AED; box-shadow: 0 0 15px rgba(124, 58, 237, 0.4); }
+        .settings-textarea { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.1); color: white; padding: 12px; border-radius: 8px; width: 100%; min-height: 120px; resize: vertical; font-family: monospace; font-size: 13px; transition: all 0.3s ease; }
+        .settings-textarea:focus { outline: none; border-color: #7C3AED; box-shadow: 0 0 15px rgba(124, 58, 237, 0.4); }
+        .settings-select { background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.15); color: white; padding: 10px 14px; border-radius: 8px; width: 100%; cursor: pointer; }
+        .settings-select:focus { outline: none; border-color: #7C3AED; }
+        .slider-track { width: 100%; height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; position: relative; }
+        .slider-fill { height: 100%; background: linear-gradient(90deg, #7C3AED, #EC4899); border-radius: 3px; transition: width 0.2s; }
+        .slider-thumb { position: absolute; top: 50%; transform: translate(-50%, -50%); width: 18px; height: 18px; background: white; border-radius: 50%; cursor: grab; box-shadow: 0 2px 6px rgba(0,0,0,0.3); }
+        .slider-thumb:active { cursor: grabbing; }
+        .eye-btn { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; color: #9CA3AF; cursor: pointer; padding: 4px; }
+        .eye-btn:hover { color: white; }
+        .btn-factory { background: linear-gradient(135deg, #EF4444, #DC2626); color: white; padding: 12px 24px; border-radius: 8px; font-weight: 600; border: none; cursor: pointer; transition: all 0.3s; box-shadow: 0 0 20px rgba(239, 68, 68, 0.3); }
+        .btn-factory:hover { box-shadow: 0 0 30px rgba(239, 68, 68, 0.5); transform: scale(1.02); }
+        .btn-save { background: linear-gradient(135deg, #06B6D4, #0891B2); color: white; padding: 12px 24px; border-radius: 8px; font-weight: 600; border: none; cursor: pointer; transition: all 0.3s; box-shadow: 0 0 20px rgba(6, 182, 212, 0.3); }
+        .btn-save:hover { box-shadow: 0 0 30px rgba(6, 182, 212, 0.5); transform: scale(1.02); }
+        .bottom-bar { position: fixed; bottom: 0; left: 0; right: 0; background: rgba(10, 15, 30, 0.95); backdrop-filter: blur(10px); border-top: 1px solid rgba(255,255,255,0.1); padding: 16px 40px; display: flex; justify-content: flex-end; gap: 16px; z-index: 100; }
+        main { padding-bottom: 100px; }
+    </style>
+</head>
+<body class="min-h-screen">
+    <nav class="sticky top-0 z-50 backdrop-blur-md border-b border-white/10">
+        <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
+                    <span class="text-white font-bold text-lg">⚙️</span>
+                </div>
+                <span class="text-xl font-bold gradient-text">Agent OS</span>
+            </div>
+            <div class="flex gap-2">
+                <button class="nav-tab active" data-tab="dashboard">Dashboard</button>
+                <button class="nav-tab" data-tab="content">Content</button>
+                <button class="nav-tab" data-tab="agents">Agents</button>
+                <button class="nav-tab" data-tab="tasks">Tasks</button>
+                <button class="nav-tab" data-tab="settings">Settings</button>
+            </div>
+            <div class="w-10 h-10 rounded-full bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center cursor-pointer glow-cyan">
+                <span class="text-white font-bold">JS</span>
+            </div>
+        </div>
+    </nav>
+    <main class="max-w-7xl mx-auto px-6 py-8">
+        <div id="dashboard-tab" class="tab-content fade-in">
+            <div class="grid gap-6">
+                <div>
+                    <h1 class="text-4xl font-bold mb-2">Dashboard</h1>
+                    <p class="text-gray-400">Real-time command center • Live Agent Monitor</p>
+                </div>
+                <div id="agent-monitor" class="grid grid-cols-1 md:grid-cols-5 gap-3"></div>
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div class="lg:col-span-2 glass-card p-6" style="background: rgba(255,255,255,0.05); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.1);">
+                        <p class="text-sm font-bold text-gray-300 mb-4" id="activity-label">Activity Flow</p>
+                        <canvas id="activity-chart" style="max-height: 200px;"></canvas>
+                    </div>
+                    <div class="glass-card p-6" style="background: rgba(255,255,255,0.05); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.1);">
+                        <p class="text-sm font-bold text-gray-300 mb-4" id="model-label">Model Distribution</p>
+                        <canvas id="model-chart" style="max-height: 200px;"></canvas>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div class="glass-card p-6" style="background: rgba(255,255,255,0.05); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.1);">
+                        <h3 class="text-lg font-bold mb-4 text-red-400">🔴 High-Priority Queue</h3>
+                        <div id="urgent-queue" class="space-y-1"></div>
+                    </div>
+                    <div class="glass-card p-6" style="background: rgba(255,255,255,0.05); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.1);">
+                        <h3 class="text-lg font-bold mb-4 text-cyan-400">💬 Recent Intelligence Feed</h3>
+                        <div id="recent-feed" class="space-y-1 font-mono text-xs max-h-64 overflow-y-auto"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        </div>
+        <div id="content-tab" class="tab-content fade-in hidden">
+            <div class="grid gap-6">
+                <div><h1 class="text-4xl font-bold mb-2">Content</h1></div>
+                <div class="glass-card p-8"><p class="text-gray-400">Coming soon...</p></div>
+            </div>
+        </div>
+        <div id="agents-tab" class="tab-content fade-in hidden">
+            <div class="grid gap-6">
+                <div>
+                    <h1 class="text-4xl font-bold mb-2">Agents</h1>
+                    <p class="text-gray-400">Real-time agent monitoring and task tracking</p>
+                </div>
+                <div id="agent-cards-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4"></div>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div class="glass-card p-6 card-stagger"><p class="text-gray-400 text-sm mb-2">Total Tasks Today</p><p class="text-3xl font-bold" id="stat-today">0</p></div>
+                    <div class="glass-card p-6 card-stagger"><p class="text-gray-400 text-sm mb-2">Total Tasks This Week</p><p class="text-3xl font-bold" id="stat-week">0</p></div>
+                    <div class="glass-card p-6 card-stagger"><p class="text-gray-400 text-sm mb-2">Most Active Agent</p><p class="text-3xl font-bold" id="stat-active">—</p></div>
+                    <div class="glass-card p-6 card-stagger"><p class="text-gray-400 text-sm mb-2">Success Rate</p><p class="text-3xl font-bold" id="stat-success">—</p></div>
+                </div>
+                <div class="glass-card p-6 card-stagger">
+                    <h3 class="text-xl font-bold mb-4">Model Usage Today</h3>
+                    <table class="w-full text-sm">
+                        <thead><tr class="border-b border-white/10"><th class="text-left py-3 px-4 text-gray-400">Agent</th><th class="text-left py-3 px-4 text-gray-400">Model</th><th class="text-left py-3 px-4 text-gray-400">Tasks</th></tr></thead>
+                        <tbody id="model-table-body"></tbody>
+                    </table>
+                </div>
+                <div class="glass-card p-6 card-stagger">
+                    <h3 class="text-xl font-bold mb-4">Recent Activity (Last 50)</h3>
+                    <div id="activity-feed" class="space-y-3" style="max-height: 500px; overflow-y: auto;"></div>
+                </div>
+            </div>
+        </div>
+        <div id="tasks-tab" class="tab-content fade-in hidden">
+            <div class="grid gap-6">
+                <div>
+                    <h1 class="text-4xl font-bold mb-2">Tasks</h1>
+                    <p class="text-gray-400">Manage your tasks with Kanban board</p>
+                </div>
+                <div class="glass-card p-4 flex items-center gap-6" style="max-height: 140px;">
+                    <div style="width: 100px; height: 100px;"><canvas id="productivity-chart"></canvas></div>
+                    <div class="flex gap-3 flex-1">
+                        <div class="glass-card p-3 flex-1 border-l-2" style="border-left-color: #3B82F6;">
+                            <p class="text-xs text-gray-400">To Do</p>
+                            <p class="text-lg font-bold"><span id="stat-todo">0</span>/<span id="stat-todo-total">0</span></p>
+                            <p class="text-xs text-blue-400"><span id="stat-todo-pct">0</span>%</p>
+                        </div>
+                        <div class="glass-card p-3 flex-1 border-l-2" style="border-left-color: #F59E0B;">
+                            <p class="text-xs text-gray-400">Doing</p>
+                            <p class="text-lg font-bold"><span id="stat-doing">0</span>/<span id="stat-doing-total">0</span></p>
+                            <p class="text-xs text-amber-400"><span id="stat-doing-pct">0</span>%</p>
+                        </div>
+                        <div class="glass-card p-3 flex-1 border-l-2" style="border-left-color: #10B981;">
+                            <p class="text-xs text-gray-400">Done</p>
+                            <p class="text-lg font-bold"><span id="stat-done">0</span>/<span id="stat-done-total">0</span></p>
+                            <p class="text-xs text-green-400"><span id="stat-done-pct">0</span>%</p>
+                        </div>
+                    </div>
+                    <div class="px-4 py-2 rounded-full text-sm font-bold" id="motivational-badge" style="background: rgba(124, 58, 237, 0.2); color: #7C3AED; white-space: nowrap;">
+                        Just getting started 🚀
+                    </div>
+                </div>
+                <div class="flex gap-3">
+                    <select id="filter-category" class="glass-card px-4 py-2 rounded text-sm text-white">
+                        <option value="">All Categories</option>
+                        <option value="Work">Work</option>
+                        <option value="Marketing">Marketing</option>
+                        <option value="Development">Development</option>
+                        <option value="Personal">Personal</option>
+                    </select>
+                    <select id="filter-priority" class="glass-card px-4 py-2 rounded text-sm text-white">
+                        <option value="">All Priorities</option>
+                        <option value="Urgent">Urgent</option>
+                        <option value="Normal">Normal</option>
+                        <option value="Someday">Someday</option>
+                    </select>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="space-y-4">
+                        <h3 class="text-lg font-bold text-blue-400">📋 To Do (<span id="count-todo">0</span>)</h3>
+                        <div id="column-todo" class="space-y-3 min-h-96 p-4 rounded-lg" style="background: rgba(59, 130, 246, 0.05); border: 1px solid rgba(59, 130, 246, 0.2);"></div>
+                        <button class="w-full py-2 text-center text-gray-400 hover:text-gray-200 text-sm rounded" onclick="showAddTaskForm('todo')">+ Add Task</button>
+                    </div>
+                    <div class="space-y-4">
+                        <h3 class="text-lg font-bold text-amber-400">⚡ Doing (<span id="count-doing">0</span>)</h3>
+                        <div id="column-doing" class="space-y-3 min-h-96 p-4 rounded-lg" style="background: rgba(245, 158, 11, 0.05); border: 1px solid rgba(245, 158, 11, 0.2);"></div>
+                        <button class="w-full py-2 text-center text-gray-400 hover:text-gray-200 text-sm rounded" onclick="showAddTaskForm('in_progress')">+ Add Task</button>
+                    </div>
+                    <div class="space-y-4">
+                        <h3 class="text-lg font-bold text-green-400">✅ Done (<span id="count-done">0</span>)</h3>
+                        <div id="column-done" class="space-y-3 min-h-96 p-4 rounded-lg" style="background: rgba(16, 185, 129, 0.05); border: 1px solid rgba(16, 185, 129, 0.2);"></div>
+                        <button class="w-full py-2 text-center text-gray-400 hover:text-gray-200 text-sm rounded" onclick="showAddTaskForm('done')">+ Add Task</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div id="settings-tab" class="tab-content fade-in hidden">
+            <div class="grid gap-8" style="padding-bottom: 80px;">
+                <div><h1 class="text-4xl font-bold mb-2">Settings</h1><p class="text-gray-400">Configure your Agent OS environment</p></div>
+                
+                <!-- SECTION 1: SYSTEM CREDENTIALS -->
+                <div class="card-stagger" style="animation-delay: 0.1s;">
+                    <h2 class="text-xl font-bold mb-4 flex items-center gap-2"><span class="text-purple-400">🔐</span> System Credentials</h2>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="glass-card p-5">
+                            <label class="text-sm font-semibold text-gray-300 mb-2 block">Supabase URL</label>
+                            <input type="text" id="supabase-url" class="settings-input" placeholder="https://xxxxx.supabase.co">
+                        </div>
+                        <div class="glass-card p-5">
+                            <label class="text-sm font-semibold text-gray-300 mb-2 block">Supabase Anon Key</label>
+                            <div style="position: relative;">
+                                <input type="password" id="supabase-key" class="settings-input" style="padding-right: 40px;" placeholder="eyJhbGciOiJIUzI1...">
+                                <button type="button" class="eye-btn" onclick="toggleKeyVisibility()">👁️</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mt-4 flex justify-end">
+                        <button class="btn-save" onclick="saveAndReconnect()">Save & Reconnect</button>
+                    </div>
+                </div>
+
+                <!-- SECTION 2: AGENT PERSONALITIES -->
+                <div class="card-stagger" style="animation-delay: 0.2s;">
+                    <h2 class="text-xl font-bold mb-4 flex items-center gap-2"><span class="text-pink-400">🤖</span> Agent Personalities</h2>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6" id="agent-personalities"></div>
+                </div>
+
+                <!-- SECTION 3: GLOBAL PREFERENCES -->
+                <div class="card-stagger" style="animation-delay: 0.3s;">
+                    <h2 class="text-xl font-bold mb-4 flex items-center gap-2"><span class="text-cyan-400">⚡</span> Interface & Notifications</h2>
+                    <div class="glass-card p-6">
+                        <div class="space-y-5">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="font-semibold">Real-time Dashboard Auto-refresh</p>
+                                    <p class="text-sm text-gray-400">Automatically refresh data every 30 seconds</p>
+                                </div>
+                                <div class="toggle-switch" id="toggle-autorefresh" onclick="toggleSwitch(this)"></div>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="font-semibold">Sound Notifications</p>
+                                    <p class="text-sm text-gray-400">Play sound on task completion</p>
+                                </div>
+                                <div class="toggle-switch" id="toggle-sounds" onclick="toggleSwitch(this)"></div>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="font-semibold">Debug Mode</p>
+                                    <p class="text-sm text-gray-400">Show raw JSON logs in console</p>
+                                </div>
+                                <div class="toggle-switch" id="toggle-debug" onclick="toggleSwitch(this)"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- BOTTOM ACTION BAR -->
+            <div class="bottom-bar">
+                <button class="btn-factory" onclick="factoryReset()">🗑️ Factory Reset</button>
+                <button class="btn-save" onclick="saveAllChanges()">💾 Save All Changes</button>
+            </div>
+        </div>
+        <div id="edit-modal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50 backdrop-blur-sm">
+            <div class="glass-card p-8 w-full max-w-md">
+                <h3 class="text-xl font-bold mb-4">Edit Task</h3>
+                <form id="edit-form" onsubmit="saveTask(event)">
+                    <input type="hidden" id="edit-task-id">
+                    <div class="space-y-4">
+                        <div><label class="text-sm text-gray-400">Title</label><input type="text" id="edit-title" class="w-full mt-1 bg-white/10 border border-white/20 rounded px-3 py-2 text-white" required></div>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div><label class="text-sm text-gray-400">Category</label><select id="edit-category" class="w-full mt-1 bg-white/10 border border-white/20 rounded px-3 py-2 text-white"><option>Work</option><option>Marketing</option><option>Development</option><option>Personal</option></select></div>
+                            <div><label class="text-sm text-gray-400">Priority</label><select id="edit-priority" class="w-full mt-1 bg-white/10 border border-white/20 rounded px-3 py-2 text-white"><option>Urgent</option><option>Normal</option><option>Someday</option></select></div>
+                        </div>
+                        <div><label class="text-sm text-gray-400">Track Status</label><select id="edit-track-status" class="w-full mt-1 bg-white/10 border border-white/20 rounded px-3 py-2 text-white"><option>On Track</option><option>At Risk</option><option>Off Track</option></select></div>
+                        <div><label class="text-sm text-gray-400">Due Date</label><input type="date" id="edit-due-date" class="w-full mt-1 bg-white/10 border border-white/20 rounded px-3 py-2 text-white"></div>
+                    </div>
+                    <div class="flex gap-2 mt-6">
+                        <button type="button" class="flex-1 py-2 rounded bg-gray-600 hover:bg-gray-700 text-white" onclick="closeEditModal()">Cancel</button>
+                        <button type="submit" class="flex-1 py-2 rounded bg-purple-600 hover:bg-purple-700 text-white font-bold">Save</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </main>
+<script src="/config.js"></script>
+<script src="/init.js"></script>
+<script src="/agents.js"></script>
+<script src="/settings.js"></script>
+<script src="/kanban.js"></script>
+<script src="/dashboard.js"></script>
+</body>
+</html>
